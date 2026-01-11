@@ -1,6 +1,7 @@
 import discord
 from discord.abc import Messageable
 from discord.ext import commands, tasks
+from discord.utils import escape_mentions
 from config import TOKEN, ALERT_CHANNEL
 from metrics import get_remote_metrics, get_local_metrics
 from brain import get_bitty_response
@@ -30,14 +31,37 @@ async def tanya(ctx, *, pesan):
     jawaban = get_bitty_response(ctx.author.id, pesan, r_temp, r_ram, l_temp, l_disk)
     await ctx.send(jawaban)
 
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author.bot:
+        return
+
+    bot_user = bot.user
+    if bot_user and bot_user in message.mentions:
+        content = message.content
+        for mention in message.mentions:
+            if mention == bot_user:
+                content = content.replace(mention.mention, '').strip()
+
+        if not content:
+            await message.channel.send('Tag gue sambil tulis pertanyaan ya, Ta!')
+        else:
+            r_temp, r_ram = get_remote_metrics()
+            l_temp, _, _, l_disk = get_local_metrics()
+            jawaban = get_bitty_response(message.author.id, escape_mentions(content), r_temp, r_ram, l_temp, l_disk)
+            await message.channel.send(jawaban, reference=message)
+        return
+
+    await bot.process_commands(message)
+
 @bot.command()
 async def reset(ctx):
     from brain import conversation_history
     if ctx.author.id in conversation_history:
         conversation_history[ctx.author.id] = []
-        await ctx.send("🧹 Memori obrolan kita udah gue hapus. Mau bahas apa lagi, Octa?")
+        await ctx.send("🧹 Memori obrolan kita udah aku hapus. Mau bahas apa lagi nih?")
     else:
-        await ctx.send("Gue emang lagi nggak inget apa-apa soal lu, Ta. Ngobrol dulu yuk!")
+        await ctx.send("Pikiran kosong, aman Ta. Ngobrol dulu yuk!")
 
 @bot.event
 async def on_ready():
