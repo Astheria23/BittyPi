@@ -1,3 +1,5 @@
+from typing import Dict, Optional
+
 import discord
 from discord.abc import Messageable
 from discord.ext import commands, tasks
@@ -14,7 +16,7 @@ bot = commands.Bot(command_prefix='bit ', intents=intents)
 RESET_KEYWORDS = {"reset", "forget", "hapus"}
 
 
-def format_usage_message(usage_stats: dict | None) -> str | None:
+def format_usage_message(usage_stats: Optional[Dict[str, int]]) -> Optional[str]:
     if not usage_stats:
         return None
     last_prompt = usage_stats.get('last_prompt_tokens', 0)
