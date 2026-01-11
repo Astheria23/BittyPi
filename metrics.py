@@ -110,11 +110,11 @@ def get_remote_metrics() -> Dict:
 
     ram_values = _latest_chart_values(_REMOTE_RAM_CHART)
     if ram_values:
-        used_kib = ram_values.get("used", 0)
+        used_mib = ram_values.get("used", 0)
         other = sum(v for k, v in ram_values.items() if k not in {"time", "used"})
-        total_kib = used_kib + other
-        metrics["ram_used_gb"] = used_kib / (1024 ** 2)
-        metrics["ram_total_gb"] = total_kib / (1024 ** 2) if total_kib else None
+        total_mib = used_mib + other
+        metrics["ram_used_gb"] = used_mib / 1024
+        metrics["ram_total_gb"] = total_mib / 1024 if total_mib else None
 
     cpu_values = _latest_chart_values(_REMOTE_CPU_CHART)
     if cpu_values:
