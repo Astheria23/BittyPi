@@ -33,6 +33,20 @@ def format_usage_message(usage_stats: Optional[Dict[str, int]]) -> Optional[str]
         f"= {session_total} token."
     )
 
+
+def _safe_float(value: object) -> Optional[float]:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_temp_text(value: object) -> str:
+    temp_val = _safe_float(value)
+    if temp_val is None:
+        return str(value)
+    return f"{temp_val:.1f}°C"
+
 @tasks.loop(seconds=60)
 async def check_alerts():
     if not bot.is_ready() or ALERT_CHANNEL is None:
@@ -40,12 +54,18 @@ async def check_alerts():
     channel = bot.get_channel(ALERT_CHANNEL)
     if not isinstance(channel, Messageable):
         return
-    r_temp, _ = get_remote_metrics()
-    l_temp, _, _, _ = get_local_metrics()
+    remote = get_remote_metrics()
+    local = get_local_metrics()
+    r_temp = remote.get('temp')
+    l_temp = local.get('temp')
+
     if isinstance(r_temp, (int, float)) and r_temp > 75:
         await channel.send(f"⚠️ **ALERT: X555BP Overheat!** ({r_temp}°C)")
-    if float(l_temp) > 65:
-        await channel.send(f"⚠️ **ALERT: Bitty Overheat!** ({l_temp}°C)")
+
+    l_temp_val = _safe_float(l_temp)
+
+    if l_temp_val and l_temp_val > 65:
+        await channel.send(f"⚠️ **ALERT: Bitty Overheat!** ({l_temp_val}°C)")
 
 
 @tasks.loop(hours=6)
@@ -56,26 +76,33 @@ async def scheduled_digest():
     if not isinstance(channel, Messageable):
         return
 
-    metrics = list(get_remote_metrics()) + list(get_local_metrics())
-    r_temp, r_ram, l_temp, l_ram_u, l_ram_t, l_disk = metrics
+    remote = get_remote_metrics()
+    local = get_local_metrics()
 
-    embed = create_embed(r_temp, r_ram, l_temp, l_ram_u, l_ram_t, l_disk)
+    embed = create_embed(
+        remote.get('temp'),
+        remote.get('ram_used_gb', 0.0),
+        local.get('temp'),
+        local.get('ram_used_gb', 0.0),
+        local.get('ram_total_gb', 0.0),
+        local.get('disk_percent', 0.0)
+    )
     embed.title = "🛰️ Bitty Digest 6 Jam"
     embed.set_footer(text="⏱️ Digest | Admin: Octa | Next +6 jam")
 
     summary_text = (
         "📬 **Ringkasan otomatis tiap 6 jam**\n"
-        f"• Server: {r_temp}°C, RAM {r_ram:.2f} GB\n"
-        f"• Raspi: {l_temp}°C, RAM {l_ram_u:.2f}/{l_ram_t:.1f} GB, Disk {l_disk}%"
+        f"• Server: {_format_temp_text(remote.get('temp'))}, RAM {remote.get('ram_used_gb', 0.0):.2f} GB, CPU {remote.get('cpu_percent', 'n/a')}%\n"
+        f"• Raspi: {_format_temp_text(local.get('temp'))}, RAM {local.get('ram_used_gb', 0.0):.2f}/{local.get('ram_total_gb', 0.0):.1f} GB, Disk {local.get('disk_percent', 0.0)}%"
     )
 
     await channel.send(summary_text, embed=embed)
 
 @bot.command()
 async def tanya(ctx, *, pesan):
-    r_temp, r_ram = get_remote_metrics()
-    l_temp, _, _, l_disk = get_local_metrics()
-    jawaban, _ = get_bitty_response(ctx.author.id, pesan, r_temp, r_ram, l_temp, l_disk)
+    remote = get_remote_metrics()
+    local = get_local_metrics()
+    jawaban, _ = get_bitty_response(ctx.author.id, pesan, remote, local)
     await ctx.send(jawaban)
 
 @bot.event
@@ -96,15 +123,13 @@ async def on_message(message: discord.Message):
             reset_conversation(message.author.id)
             await message.channel.send('🧹 Obrolan kita udah gue reset. Gas lagi?')
         else:
-            r_temp, r_ram = get_remote_metrics()
-            l_temp, _, _, l_disk = get_local_metrics()
+            remote = get_remote_metrics()
+            local = get_local_metrics()
             jawaban, _ = get_bitty_response(
                 message.author.id,
                 escape_mentions(content),
-                r_temp,
-                r_ram,
-                l_temp,
-                l_disk
+                remote,
+                local
             )
             await message.channel.send(jawaban, reference=message)
         return
