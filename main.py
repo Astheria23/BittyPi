@@ -1,9 +1,8 @@
 import discord
+from discord.abc import Messageable
 from discord.ext import commands, tasks
-import asyncio
 from config import TOKEN, ALERT_CHANNEL
 from metrics import get_remote_metrics, get_local_metrics
-from ui import create_embed
 from brain import get_bitty_response
 
 intents = discord.Intents.default()
@@ -12,9 +11,11 @@ bot = commands.Bot(command_prefix='bit ', intents=intents)
 
 @tasks.loop(seconds=60)
 async def check_alerts():
-    if not bot.is_ready(): return
+    if not bot.is_ready() or ALERT_CHANNEL is None:
+        return
     channel = bot.get_channel(ALERT_CHANNEL)
-    if not channel: return
+    if not isinstance(channel, Messageable):
+        return
     r_temp, _ = get_remote_metrics()
     l_temp, _, _, _ = get_local_metrics()
     if isinstance(r_temp, (int, float)) and r_temp > 75:
@@ -41,6 +42,9 @@ async def reset(ctx):
 @bot.event
 async def on_ready():
     check_alerts.start()
-    print(f'Bitty Guard is Online!')
+    print('Bitty Guard is Online!')
+
+if not TOKEN:
+    raise RuntimeError('DISCORD_TOKEN belum di-set di environment (.env)')
 
 bot.run(TOKEN)

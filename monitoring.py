@@ -1,17 +1,13 @@
 import discord
+from discord.abc import Messageable
 from discord.ext import commands, tasks
 import requests
 import psutil
 import os
 import asyncio
 import time
-from dotenv import load_dotenv
 
-load_dotenv()
-
-TOKEN = os.getenv('DISCORD_TOKEN')
-ALERT_CHANNEL = os.getenv('ALERT_CHANNEL_ID')
-BASE_URL = os.getenv('NETDATA_BASE_URL')
+from config import TOKEN, ALERT_CHANNEL, BASE_URL
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -26,7 +22,7 @@ def get_remote_metrics():
         ram_r = requests.get(ram_url, timeout=3).json()
         ram_used = ram_r['data'][0][1] / 1024
         return temp_r, ram_used
-    except:
+    except Exception:
         return "Offline", 0
 
 def get_local_metrics():
@@ -49,9 +45,13 @@ def create_embed(r_temp, r_ram, l_temp, l_ram_u, l_ram_t, l_disk, is_live=False)
 
 @tasks.loop(seconds=60)
 async def check_alerts():
-    if not bot.is_ready(): return
+    if not bot.is_ready():
+        return
+    if ALERT_CHANNEL is None:
+        return
     channel = bot.get_channel(ALERT_CHANNEL)
-    if not channel: return
+    if not isinstance(channel, Messageable):
+        return
 
     r_temp, _ = get_remote_metrics()
     l_temp, _, _, _ = get_local_metrics()
@@ -63,26 +63,35 @@ async def check_alerts():
 
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user.name}')
+    if bot.user:
+        print(f'Logged in as {bot.user.name}')
+    else:
+        print('Logged in, but bot user belum tersedia')
     if not check_alerts.is_running():
         check_alerts.start()
 
 @bot.command()
 async def monitor(ctx):
-    data = list(get_remote_metrics()) + list(get_local_metrics())
-    await ctx.send(embed=create_embed(*data))
+    r_temp, r_ram = get_remote_metrics()
+    l_temp, l_ram_u, l_ram_t, l_disk = get_local_metrics()
+    await ctx.send(embed=create_embed(r_temp, r_ram, l_temp, l_ram_u, l_ram_t, l_disk))
 
 @bot.command()
 async def live(ctx):
-    data = list(get_remote_metrics()) + list(get_local_metrics())
-    message = await ctx.send(embed=create_embed(*data, is_live=True))
+    r_temp, r_ram = get_remote_metrics()
+    l_temp, l_ram_u, l_ram_t, l_disk = get_local_metrics()
+    message = await ctx.send(embed=create_embed(r_temp, r_ram, l_temp, l_ram_u, l_ram_t, l_disk, is_live=True))
     
     while True:
         await asyncio.sleep(10) # Update tiap 10 detik
-        data = list(get_remote_metrics()) + list(get_local_metrics())
+        r_temp, r_ram = get_remote_metrics()
+        l_temp, l_ram_u, l_ram_t, l_disk = get_local_metrics()
         try:
-            await message.edit(embed=create_embed(*data, is_live=True))
-        except:
+            await message.edit(embed=create_embed(r_temp, r_ram, l_temp, l_ram_u, l_ram_t, l_disk, is_live=True))
+        except Exception:
             break # Stop kalau pesan dihapus
+
+if not TOKEN:
+    raise RuntimeError('DISCORD_TOKEN belum di-set di environment (.env)')
 
 bot.run(TOKEN)
