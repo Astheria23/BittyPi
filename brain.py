@@ -8,7 +8,6 @@ def get_bitty_response(user_id, user_input, r_temp, r_ram, l_temp, l_disk):
     if user_id not in conversation_history:
         conversation_history[user_id] = []
 
-    # System context yang lebih ketat soal angka hardware
     system_context = (
         f"Kamu adalah Bitty, asisten IoT Octa. Gaya casual, serius, dan blak-blakan. "
         f"PENTING: Gunakan logika hardware Informatika. "
@@ -24,8 +23,8 @@ def get_bitty_response(user_id, user_input, r_temp, r_ram, l_temp, l_disk):
 
     chat_completion = client.chat.completions.create(
         messages=messages,
-        model="llama-3.3-70b-versatile", # Upgrade ke model 70B yang lebih pinter
-        temperature=0.5 # Turunin dikit biar gak terlalu kreatif/halu
+        model="llama-3.3-70b-versatile", 
+        temperature=0.5 
     )
     
     response = chat_completion.choices[0].message.content
