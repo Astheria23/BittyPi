@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Dict, Optional
 
 import discord
@@ -12,6 +13,8 @@ from brain import get_bitty_response, reset_conversation, get_usage_snapshot
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='bit ', intents=intents)
+
+DIGEST_INTERVAL_HOURS = 3
 
 RESET_KEYWORDS = {"reset", "forget", "hapus"}
 
@@ -47,12 +50,39 @@ def _format_temp_text(value: object) -> str:
         return str(value)
     return f"{temp_val:.1f}°C"
 
+
+def _log(message: str) -> None:
+    timestamp = datetime.now().isoformat(timespec='seconds')
+    print(f"[{timestamp}] {message}")
+
+
+async def _get_alert_channel() -> Optional[Messageable]:
+    if ALERT_CHANNEL is None:
+        _log("ALERT_CHANNEL belum di-set, skip pengiriman.")
+        return None
+
+    channel = bot.get_channel(ALERT_CHANNEL)
+    if isinstance(channel, Messageable):
+        return channel
+
+    try:
+        fetched = await bot.fetch_channel(ALERT_CHANNEL)
+    except discord.DiscordException as exc:
+        _log(f"Gagal fetch ALERT_CHANNEL {ALERT_CHANNEL}: {exc}")
+        return None
+
+    if isinstance(fetched, Messageable):
+        return fetched
+
+    _log(f"Channel {ALERT_CHANNEL} bukan Messageable, skip pengiriman.")
+    return None
+
 @tasks.loop(seconds=60)
 async def check_alerts():
-    if not bot.is_ready() or ALERT_CHANNEL is None:
+    if not bot.is_ready():
         return
-    channel = bot.get_channel(ALERT_CHANNEL)
-    if not isinstance(channel, Messageable):
+    channel = await _get_alert_channel()
+    if channel is None:
         return
     remote = get_remote_metrics()
     local = get_local_metrics()
@@ -67,13 +97,12 @@ async def check_alerts():
     if l_temp_val and l_temp_val > 65:
         await channel.send(f"⚠️ **ALERT: Bitty Overheat!** ({l_temp_val}°C)")
 
-
-@tasks.loop(hours=6)
+@tasks.loop(hours=DIGEST_INTERVAL_HOURS)
 async def scheduled_digest():
-    if not bot.is_ready() or ALERT_CHANNEL is None:
+    if not bot.is_ready():
         return
-    channel = bot.get_channel(ALERT_CHANNEL)
-    if not isinstance(channel, Messageable):
+    channel = await _get_alert_channel()
+    if channel is None:
         return
 
     remote = get_remote_metrics()
@@ -87,16 +116,17 @@ async def scheduled_digest():
         local.get('ram_total_gb', 0.0),
         local.get('disk_percent', 0.0)
     )
-    embed.title = "🛰️ Bitty Digest 6 Jam"
-    embed.set_footer(text="⏱️ Digest | Admin: Octa | Next +6 jam")
+    embed.title = f"🛰️ Bitty Digest {DIGEST_INTERVAL_HOURS} Jam"
+    embed.set_footer(text=f"⏱️ Digest | Admin: Octa | Next +{DIGEST_INTERVAL_HOURS} jam")
 
     summary_text = (
-        "📬 **Ringkasan otomatis tiap 6 jam**\n"
+        f"📬 **Ringkasan otomatis tiap {DIGEST_INTERVAL_HOURS} jam**\n"
         f"• Server: {_format_temp_text(remote.get('temp'))}, RAM {remote.get('ram_used_gb', 0.0):.2f} GB, CPU {remote.get('cpu_percent', 'n/a')}%\n"
         f"• Raspi: {_format_temp_text(local.get('temp'))}, RAM {local.get('ram_used_gb', 0.0):.2f}/{local.get('ram_total_gb', 0.0):.1f} GB, Disk {local.get('disk_percent', 0.0)}%"
     )
 
     await channel.send(summary_text, embed=embed)
+    _log("Digest berkala berhasil dikirim.")
 
 @bot.command()
 async def tanya(ctx, *, pesan):
@@ -153,8 +183,10 @@ async def token_usage(ctx):
 
 @bot.event
 async def on_ready():
-    check_alerts.start()
-    scheduled_digest.start()
+    if not check_alerts.is_running():
+        check_alerts.start()
+    if not scheduled_digest.is_running():
+        scheduled_digest.start()
     print('Bitty Guard is Online!')
 
 if not TOKEN:

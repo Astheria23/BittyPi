@@ -4,9 +4,14 @@ import threading
 import os
 import random
 import math
+import asyncio
+from ears import Ears
+import brain
+from metrics import get_remote_metrics, get_local_metrics
 
 # Inisialisasi
 pygame.init()
+pygame.mixer.init()
 #os.environ["DISPLAY"] = ":0" 
 
 screen_width = 480
@@ -104,6 +109,70 @@ def terminal_input():
 
 input_thread = threading.Thread(target=terminal_input, daemon=True)
 input_thread.start()
+
+stop_voice = threading.Event()
+
+def run_voice_assistant():
+    global current_emotion, saved_emotion, running
+    print("[Voice] Initializing Ears...")
+    ears = Ears(wake_word_threshold=0.6)
+    
+    print("[Voice] Ready! Say 'Hey Jarvis'")
+    while running and not stop_voice.is_set():
+        try:
+            # 1. Listen for Wake Word
+            if ears.listen_for_wake_word(stop_voice):
+                if stop_voice.is_set(): break
+                print("[Voice] Wake word detected!")
+                
+                # Visual Feedback: Listening
+                saved_emotion = current_emotion # Backup
+                current_emotion = "happy" 
+                set_emotion_targets("happy")
+
+                # 2. Record Command
+                audio_path = ears.record_command(duration=5)
+                
+                if audio_path:
+                    # Visual Feedback: Thinking
+                    current_emotion = "idle" # Neutral expression while thinking
+                    set_emotion_targets("idle")
+                    
+                    # 3. Transcribe
+                    user_text = brain.transcribe_audio(audio_path)
+                    print(f"[Voice] User: {user_text}")
+                    
+                    if user_text:
+                        # 4. Get LLM Response
+                        remote = get_remote_metrics()
+                        local = get_local_metrics()
+                        response_text, _ = brain.get_bitty_response("voice_user", user_text, remote, local)
+                        print(f"[Voice] Bitty: {response_text}")
+                        
+                        # 5. TTS & Speak
+                        current_emotion = "talk"
+                        set_emotion_targets("talk")
+                        
+                        outfile = "response.mp3"
+                        asyncio.run(brain.speak_response(response_text, outfile))
+                        
+                        pygame.mixer.music.load(outfile)
+                        pygame.mixer.music.play()
+                        while pygame.mixer.music.get_busy() and not stop_voice.is_set():
+                            time.sleep(0.1)
+                            
+                        # Return to normal
+                        current_emotion = saved_emotion
+                        set_emotion_targets(saved_emotion)
+                    
+        except Exception as e:
+            print(f"[Voice] Error: {e}")
+            time.sleep(1)
+            
+    ears.close()
+
+voice_thread = threading.Thread(target=run_voice_assistant, daemon=True)
+voice_thread.start()
 
 last_blink = time.time()
 is_blinking = False
@@ -213,5 +282,9 @@ try:
         pygame.display.flip()
         clock.tick(60)
 
-except KeyboardInterrupt: running = False
-finally: pygame.quit()
+except KeyboardInterrupt: 
+    running = False
+    stop_voice.set()
+finally: 
+    stop_voice.set()
+    pygame.quit()

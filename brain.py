@@ -1,9 +1,26 @@
+import asyncio
+import edge_tts
 from groq import Groq
 from config import GROQ_KEY, MODEL_NAME
 
 client = Groq(api_key=GROQ_KEY)
 conversation_history = {}
 conversation_usage = {}
+
+def transcribe_audio(filename: str) -> str:
+    with open(filename, "rb") as file:
+        transcription = client.audio.transcriptions.create(
+            file=(filename, file.read()),
+            model="whisper-large-v3",
+            response_format="json"
+        )
+    return transcription.text
+
+async def speak_response(text: str, output_file: str = "response.mp3") -> str:
+    # Voice: id-ID-ArdiNeural (Male) or id-ID-GadisNeural (Female)
+    communicate = edge_tts.Communicate(text, "id-ID-ArdiNeural")
+    await communicate.save(output_file)
+    return output_file
 
 def _extract_usage_tokens(usage_obj):
     if not usage_obj:

@@ -112,3 +112,10 @@ xdg==5
 xkit==0.0.0
 yt-dlp==2024.4.9
 zenmap==7.94+svn
+PyAudio==0.2.14
+numpy==1.26.4
+openwakeword==0.6.0
+edge-tts==6.1.10
+scipy==1.13.0
+soundfile==0.12.1
+asyncio==3.4.3
