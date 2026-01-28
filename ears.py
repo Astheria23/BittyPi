@@ -22,9 +22,13 @@ from typing import Tuple, Optional
 # Constants
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
-RATE = 16000
+TARGET_RATE = 16000
 CHUNK = 1280
-MIC_INDEX = None  # Auto-detect or set manually if needed
+MIC_INDEX = None
+
+import scipy.signal
+
+import scipy.signal
 
 class Ears:
     def __init__(self, wake_word_threshold=0.5):
@@ -60,15 +64,28 @@ class Ears:
 
         print("[Ears] Listening for 'Hey Jarvis'...")
         
-        # Ring buffer to keep slight history (optional, handled by OWW mostly)
         while not stop_event.is_set():
-            data = self.stream.read(CHUNK, exception_on_overflow=False)
+            # Read enough frames to get roughly CHUNK at TARGET_RATE
+            # If rate is 48000, we need 3x the data to get same time duration
+            read_size = int(self.chunk * (self.rate / TARGET_RATE))
+            try:
+                data = self.stream.read(read_size, exception_on_overflow=False)
+            except OSError as e:
+                print(f"[Ears] Read Error: {e}")
+                continue
+
             audio_data = np.frombuffer(data, dtype=np.int16)
             
+            # Resample if needed
+            if self.rate != TARGET_RATE:
+                # Number of samples we want
+                target_samples = int(len(audio_data) * TARGET_RATE / self.rate)
+                audio_data = scipy.signal.resample(audio_data, target_samples).astype(np.int16)
+
             # Feed to openWakeWord
             prediction = self.model.predict(audio_data)
             
-            # Check prediction (returns dict like {'hey_jarvis': 0.002, ...})
+            # Check prediction
             for mdl_name, score in prediction.items():
                 if score > self.threshold:
                     print(f"[Ears] Wake Word Detected! ({score:.2f})")
@@ -90,11 +107,22 @@ class Ears:
         silence_start = None
         
         while (time.time() - start_time) < duration:
-            data = self.stream.read(CHUNK, exception_on_overflow=False)
-            frames.append(data)
+            read_size = int(self.chunk * (self.rate / TARGET_RATE))
+            try:
+                data = self.stream.read(read_size, exception_on_overflow=False)
+            except OSError:
+                continue
+                
+            audio_data = np.frombuffer(data, dtype=np.int16)
+            
+            # Resample for VAD and saving
+            if self.rate != TARGET_RATE:
+                target_samples = int(len(audio_data) * TARGET_RATE / self.rate)
+                audio_data = scipy.signal.resample(audio_data, target_samples).astype(np.int16)
+                
+            frames.append(audio_data.tobytes())
             
             # Simple VAD (Energy based)
-            audio_data = np.frombuffer(data, dtype=np.int16)
             energy = np.sqrt(np.mean(audio_data**2))
             
             if energy < silence_threshold:
@@ -111,7 +139,7 @@ class Ears:
         wf = wave.open(filename, 'wb')
         wf.setnchannels(CHANNELS)
         wf.setsampwidth(self.audio.get_sample_size(FORMAT))
-        wf.setframerate(RATE)
+        wf.setframerate(TARGET_RATE) # Always save as 16k
         wf.writeframes(b''.join(frames))
         wf.close()
         
@@ -121,14 +149,26 @@ class Ears:
         if self.stream is not None:
             self.stream.close()
             
-        self.stream = self.audio.open(
-            format=FORMAT,
-            channels=CHANNELS,
-            rate=RATE,
-            input=True,
-            input_device_index=self.device_index,
-            frames_per_buffer=CHUNK
-        )
+        supported_rates = [16000, 48000, 44100, 8000]
+        
+        for r in supported_rates:
+            try:
+                print(f"[Ears] Trying sample rate: {r}Hz...")
+                self.stream = self.audio.open(
+                    format=FORMAT,
+                    channels=CHANNELS,
+                    rate=r,
+                    input=True,
+                    input_device_index=self.device_index,
+                    frames_per_buffer=int(CHUNK * (r / TARGET_RATE))
+                )
+                self.rate = r
+                print(f"[Ears] Success! Running at {r}Hz")
+                return
+            except Exception as e:
+                print(f"[Ears] Failed rate {r}: {e}")
+                
+        raise Exception("No supported sample rate found for this microphone")
 
     def close(self):
         if self.stream:
