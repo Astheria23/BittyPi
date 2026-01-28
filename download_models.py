@@ -16,34 +16,34 @@ import openwakeword
 import shutil
 import os
 
-print("Downloading hey_jarvis_v0.1.tflite...")
-openwakeword.utils.download_models(model_names=["hey_jarvis_v0.1.tflite"])
+# Mock onnxruntime (already done above)
+# ... imports ...
+import openwakeword
+import shutil
+import os
+import requests
 
-# It likely downloaded to the openwakeword package directory
-package_dir = os.path.dirname(openwakeword.__file__)
-source_path = os.path.join(package_dir, "resources/models/hey_jarvis_v0.1.tflite")
+MODEL_URL = "https://github.com/dscripka/openWakeWord/blob/main/openwakeword/resources/models/hey_jarvis_v0.1.tflite?raw=true"
+TARGET_PATH = "models/hey_jarvis_v0.1.tflite"
 
-target_path = "models/hey_jarvis_v0.1.tflite"
+print(f"Downloading hey_jarvis_v0.1.tflite from {MODEL_URL}...")
 
-if os.path.exists(source_path):
-    print(f"Found model at: {source_path}")
-    os.makedirs("models", exist_ok=True)
-    # Remove empty/corrupt file if exists
-    if os.path.exists(target_path):
-        os.remove(target_path)
+os.makedirs("models", exist_ok=True)
+if os.path.exists(TARGET_PATH):
+    os.remove(TARGET_PATH)
+
+try:
+    response = requests.get(MODEL_URL, stream=True)
+    response.raise_for_status()
+    with open(TARGET_PATH, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
     
-    shutil.copy(source_path, target_path)
-    print(f"✅ Success! Moved to {target_path}")
-elif os.path.exists("hey_jarvis_v0.1.tflite"):
-    # Fallback: Check CWD
-    print("Found model in CWD")
-    os.makedirs("models", exist_ok=True)
-    if os.path.exists(target_path):
-        os.remove(target_path)
-    shutil.move("hey_jarvis_v0.1.tflite", target_path)
-    print(f"✅ Success! Moved to {target_path}")
-else:
-    print(f"❌ Error: Model not found at {source_path} or CWD")
-    # Debug info
-    print(f"Package dir: {package_dir}")
-    print(f"Contents of resources/models: {os.listdir(os.path.join(package_dir, 'resources/models'))}")
+    # Verify size
+    if os.path.getsize(TARGET_PATH) < 1000:
+        print("❌ Error: Downloaded file is too small (likely HTML).")
+    else:
+        print(f"✅ Success! Downloaded to {TARGET_PATH} ({os.path.getsize(TARGET_PATH)} bytes)")
+
+except Exception as e:
+    print(f"❌ Error downloading: {e}")
