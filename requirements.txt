@@ -7,6 +7,6 @@ pygame==2.5.2
 PyAudio==0.2.14
 numpy==1.26.4
 # openwakeword installed manually in deploy.sh to avoid onnxruntime
-tflite-runtime==2.14.0
+# tflite-runtime installed manually in deploy.sh
 edge-tts==6.1.10
 soundfile==0.12.1
