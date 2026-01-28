@@ -23,7 +23,7 @@ import shutil
 import os
 import requests
 
-MODEL_URL = "https://github.com/dscripka/openWakeWord/blob/main/openwakeword/resources/models/hey_jarvis_v0.1.tflite?raw=true"
+MODEL_URL = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.tflite"
 TARGET_PATH = "models/hey_jarvis_v0.1.tflite"
 
 print(f"Downloading hey_jarvis_v0.1.tflite from {MODEL_URL}...")
