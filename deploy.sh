@@ -1,8 +1,11 @@
 #!/bin/bash
 
-echo "🚀 Memulai proses update Bitty Guard..."
-
 git pull origin main
+
+echo "📦 Installing system dependencies..."
+sudo apt-get update
+sudo apt-get install -y libffi-dev libportaudio2 portaudio19-dev python3-dev libopenblas-dev
+
 pip install -r requirements.txt
 # Manual install for openwakeword to avoid onnxruntime dependency on Pi
 pip install openwakeword==0.6.0 --no-deps

@@ -1,6 +1,17 @@
 import pyaudio
 import numpy as np
-import openwakeword
+import sys
+import types
+
+# Hack: openwakeword imports onnxruntime at top level.
+# We want to use tflite-runtime on Pi, but the import crashes.
+# We mock onnxruntime so the import passes, then usage uses tflite.
+try:
+    import onnxruntime
+except ImportError:
+    m = types.ModuleType("onnxruntime")
+    sys.modules["onnxruntime"] = m
+
 from openwakeword.model import Model
 import collections
 import time
