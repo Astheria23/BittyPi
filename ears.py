@@ -30,7 +30,7 @@ class Ears:
     def __init__(self, wake_word_threshold=0.5):
         self.audio = pyaudio.PyAudio()
         self.stream = None
-        self.model = Model(wakeword_models=["hey_jarvis"], inference_framework="tflite")
+
         self.threshold = wake_word_threshold
         
         # Determine mic index (prefer USB or I2S generic names if visible, else default)

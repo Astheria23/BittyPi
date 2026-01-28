@@ -1,3 +1,12 @@
+import sys
+import types
+# Mock onnxruntime to bypass import error on Pi
+try:
+    import onnxruntime
+except ImportError:
+    m = types.ModuleType("onnxruntime")
+    sys.modules["onnxruntime"] = m
+
 import openwakeword.utils
 import os
 
