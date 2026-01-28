@@ -34,6 +34,8 @@ class Ears:
     def __init__(self, wake_word_threshold=0.5):
         self.audio = pyaudio.PyAudio()
         self.stream = None
+        self.chunk = CHUNK
+        self.rate = TARGET_RATE
 
         self.threshold = wake_word_threshold
         
