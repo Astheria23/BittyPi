@@ -25,6 +25,7 @@ CHANNELS = 1
 TARGET_RATE = 16000
 CHUNK = 1280
 MIC_INDEX = None
+SOFTWARE_GAIN = 4.0 # Boost volume digitaly
 
 import scipy.signal
 
@@ -79,10 +80,14 @@ class Ears:
             audio_data = np.frombuffer(data, dtype=np.int16)
             
             # Resample if needed
+            # Resample if needed
             if self.rate != TARGET_RATE:
                 # Number of samples we want
                 target_samples = int(len(audio_data) * TARGET_RATE / self.rate)
                 audio_data = scipy.signal.resample(audio_data, target_samples).astype(np.int16)
+
+            # Apply Gain
+            audio_data = (audio_data * SOFTWARE_GAIN).clip(-32768, 32767).astype(np.int16)
 
             # Feed to openWakeWord
             prediction = self.model.predict(audio_data)
@@ -122,10 +127,14 @@ class Ears:
                 target_samples = int(len(audio_data) * TARGET_RATE / self.rate)
                 audio_data = scipy.signal.resample(audio_data, target_samples).astype(np.int16)
                 
+            # Apply Gain
+            audio_data = (audio_data * SOFTWARE_GAIN).clip(-32768, 32767).astype(np.int16)
+
             frames.append(audio_data.tobytes())
             
             # Simple VAD (Energy based)
-            energy = np.sqrt(np.mean(audio_data**2))
+            # Fix: Cast to float to avoid overflow during squaring
+            energy = np.sqrt(np.mean(audio_data.astype(np.float64)**2))
             
             if energy < silence_threshold:
                 if silence_start is None:
