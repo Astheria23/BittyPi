@@ -36,6 +36,9 @@ class Ears:
         # Determine mic index (prefer USB or I2S generic names if visible, else default)
         self.device_index = self._find_input_device()
         print(f"[Ears] Using Input Device Index: {self.device_index}")
+        
+        # Load local TFLite model
+        self.model = Model(wakeword_models=["./models/hey_jarvis_v0.1.tflite"], inference_framework="tflite")
 
     def _find_input_device(self):
         count = self.audio.get_device_count()
