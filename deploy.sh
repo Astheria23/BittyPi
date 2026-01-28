@@ -4,7 +4,7 @@ git pull origin main
 
 echo "📦 Installing system dependencies..."
 sudo apt-get update
-sudo apt-get install -y libffi-dev libportaudio2 portaudio19-dev python3-dev libopenblas-dev
+sudo apt-get install -y libffi-dev libportaudio2 portaudio19-dev python3-dev libopenblas-dev libsdl2-mixer-2.0-0
 
 pip install -r requirements.txt
 # Manual install for openwakeword to avoid onnxruntime dependency on Pi

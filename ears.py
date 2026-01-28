@@ -43,7 +43,7 @@ class Ears:
             info = self.audio.get_device_info_by_index(i)
             name = info.get('name').lower()
             # Common names for I2S/USB mics on Pi
-            if 'dmic' in name or 'usb' in name or 'i2s' in name:
+            if 'dmic' in name or 'usb' in name or 'i2s' in name or 'voicehat' in name or 'google' in name:
                 return i
         return None # Use default
 

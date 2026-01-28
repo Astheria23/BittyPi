@@ -12,6 +12,7 @@ from metrics import get_remote_metrics, get_local_metrics
 # Inisialisasi
 pygame.init()
 pygame.mixer.init()
+font = pygame.font.Font(None, 24) # Default font
 #os.environ["DISPLAY"] = ":0" 
 
 screen_width = 480
@@ -46,6 +47,15 @@ base_eye_h = 60.0
 running = True
 current_emotion = "startup"
 saved_emotion = "idle"
+
+# Subtitles
+subtitle_text = ""
+subtitle_end_time = 0
+
+def set_subtitle(text, duration=5.0):
+    global subtitle_text, subtitle_end_time
+    subtitle_text = text
+    subtitle_end_time = time.time() + duration
 
 # Tracker Logic
 hit_taps = 0           # Ngitung tap (1-3)
@@ -124,6 +134,7 @@ def run_voice_assistant():
             if ears.listen_for_wake_word(stop_voice):
                 if stop_voice.is_set(): break
                 print("[Voice] Wake word detected!")
+                set_subtitle("Listening...", 3.0)
                 
                 # Visual Feedback: Listening
                 saved_emotion = current_emotion # Backup
@@ -141,6 +152,7 @@ def run_voice_assistant():
                     # 3. Transcribe
                     user_text = brain.transcribe_audio(audio_path)
                     print(f"[Voice] User: {user_text}")
+                    set_subtitle(f"User: {user_text}", 5.0)
                     
                     if user_text:
                         # 4. Get LLM Response
@@ -148,6 +160,7 @@ def run_voice_assistant():
                         local = get_local_metrics()
                         response_text, _ = brain.get_bitty_response("voice_user", user_text, remote, local)
                         print(f"[Voice] Bitty: {response_text}")
+                        set_subtitle(f"Bitty: {response_text}", 8.0)
                         
                         # 5. TTS & Speak
                         current_emotion = "talk"
@@ -251,6 +264,15 @@ try:
                 pygame.draw.ellipse(screen, eye_color, (e_pos_x - (m_w//2), 220 - (m_h//4) + off_y, m_w, m_h), 4)
             else: 
                 pygame.draw.arc(screen, eye_color, mouth_rect, math.pi, 0, 4)
+
+        # Draw Subtitles
+        if now < subtitle_end_time and subtitle_text:
+            text_surf = font.render(subtitle_text, True, WHITE)
+            text_rect = text_surf.get_rect(center=(screen_width // 2, screen_height - 30))
+            # Background box for readability
+            bg_rect = text_rect.inflate(10, 10)
+            pygame.draw.rect(screen, BLACK, bg_rect)
+            screen.blit(text_surf, text_rect)
 
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
